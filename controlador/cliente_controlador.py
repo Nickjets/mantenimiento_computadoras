@@ -1,26 +1,61 @@
-# from modelo.cliente import Cliente  <-- COMENTA ESTO POR AHORA
 from vista.vista_clientes import VistaClientes
+from modelo.cliente import Cliente
+import streamlit as st
 
 class ClienteControlador:
-    def __init__(self):
-        # self.modelo = Cliente()     <-- COMENTA ESTO
-        self.vista = VistaClientes()
-
     def ejecutar(self):
-        self.vista.mostrar_titulo()
-        datos_form = self.vista.mostrar_formulario_registro()
+        VistaClientes.mostrar_titulo()
 
-        if datos_form:
-            # SIMULACIÓN DE GUARDADO
-            # En lugar de guardar en BD, solo mostramos éxito visualmente
-            self.vista.mensaje_exito(f"Simulación: Cliente {datos_form['nombres']} guardado (No en BD)")
+        # BUSCAR
+        cedula_buscar = VistaClientes.buscar_cliente()
+        if cedula_buscar:
+            cliente = Cliente.buscar_por_cedula(cedula_buscar)
+            if cliente:
+                st.info(cliente)
+            else:
+                st.warning("Cliente no encontrado")
 
-        # --- AQUÍ ESTÁ EL TRUCO (DATOS FALSOS / MOCK DATA) ---
-        lista_clientes_falsa = [
-            {"id_cliente": 1, "cedula": "010101", "nombres": "Pablo", "apellidos": "Jaiba", "telefono": "0999", "email": "p@test.com", "direccion": "Centro"},
-            {"id_cliente": 2, "cedula": "020202", "nombres": "Katy", "apellidos": "Velasco", "telefono": "0888", "email": "k@test.com", "direccion": "Sur"},
-            {"id_cliente": 3, "cedula": "030303", "nombres": "Pepe", "apellidos": "Grillo", "telefono": "0777", "email": "pepe@test.com", "direccion": "Norte"},
-        ]
+        # REGISTRO
+        datos = VistaClientes.mostrar_formulario_registro()
+        if datos:
+            if not Cliente.validar_cedula_ec(datos["cedula"]):
+                VistaClientes.mensaje_error("Cédula ecuatoriana inválida")
+            elif not Cliente.validar_email(datos["email"]):
+                VistaClientes.mensaje_error("Email inválido")
+            else:
+                Cliente(**datos).guardar()
+                VistaClientes.mensaje_exito("Cliente registrado")
 
-        # Le pasamos la lista falsa a la vista
-        self.vista.mostrar_tabla(lista_clientes_falsa)
+        # LISTADO
+        clientes = Cliente.listar_todos()
+        #acciones
+        accion, cliente_sel = VistaClientes.mostrar_tabla(clientes)
+        if accion == "eliminar":
+            Cliente.eliminar(cliente_sel["id_cliente"])
+            VistaClientes.mensaje_exito("Cliente eliminado")
+            st.rerun()
+        if accion == "editar":
+            st.session_state["cliente_editar"] = cliente_sel
+
+        if "cliente_editar" in st.session_state:
+            c = st.session_state["cliente_editar"]
+
+            with st.expander("✏️ Editar Cliente", expanded=True):
+                with st.form("form_editar_cliente"):
+                    c["cedula"] = st.text_input("Cédula", c["cedula"])
+                    c["nombres"] = st.text_input("Nombres", c["nombres"])
+                    c["apellidos"] = st.text_input("Apellidos", c["apellidos"])
+                    c["telefono"] = st.text_input("Teléfono", c["telefono"])
+                    c["email"] = st.text_input("Email", c["email"])
+                    c["direccion"] = st.text_input("Dirección", c["direccion"])
+
+                    if st.form_submit_button("Actualizar"):
+                        if not Cliente.validar_cedula_ec(c["cedula"]):
+                            VistaClientes.mensaje_error("Cédula inválida")
+                        elif not Cliente.validar_email(c["email"]):
+                            VistaClientes.mensaje_error("Email inválido")
+                        else:
+                            Cliente(**c).actualizar()
+                            del st.session_state["cliente_editar"]
+                            VistaClientes.mensaje_exito("Cliente actualizado")
+                            st.rerun()
