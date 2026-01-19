@@ -2,8 +2,9 @@ import streamlit as st
 from controlador.cliente_controlador import ClienteControlador
 from controlador.equipo_controlador import EquipoControlador
 from controlador.orden_controlador import OrdenControlador
-from controlador.respuestos_controlador import RepuestoControlador
+from controlador.repuesto_controlador import RepuestoControlador
 from controlador.reporte_controlador import ReporteControlador
+
 import db_config
 import time
 
@@ -47,7 +48,7 @@ with st.sidebar:
         st.warning("⚠️ Algunas funciones pueden no estar disponibles")
 
 # Menú principal
-menu = st.sidebar.radio("Módulos", ["Clientes", "Equipos", "Órdenes", "Bodega", "Gerencia"])
+menu = st.sidebar.radio("Módulos", ["Clientes", "Equipos", "Órdenes", "Repuestos", "Gerencia", ])
 
 # Solo mostrar la aplicación si la conexión es exitosa
 if conexion_ok:
@@ -63,7 +64,7 @@ if conexion_ok:
         app = OrdenControlador()
         app.ejecutar()
 
-    elif menu == "Bodega":
+    elif menu == "Repuestos":
         app = RepuestoControlador()
         app.ejecutar()
 
