@@ -1,9 +1,13 @@
 import streamlit as st
 from controlador.cliente_controlador import ClienteControlador
 from controlador.equipo_controlador import EquipoControlador
-from controlador.orden_controlador import OrdenControlador
+from controlador.orden_controlador import OrdenServicioControlador
 from controlador.repuesto_controlador import RepuestoControlador
 from controlador.reporte_controlador import ReporteControlador
+from controlador.tecnico_controlador import TecnicoControlador
+from controlador.catalogo_servicio_controlador import CatalogoServicoControlador
+
+
 
 import db_config
 import time
@@ -48,7 +52,7 @@ with st.sidebar:
         st.warning("⚠️ Algunas funciones pueden no estar disponibles")
 
 # Menú principal
-menu = st.sidebar.radio("Módulos", ["Clientes", "Equipos", "Órdenes", "Repuestos", "Gerencia", ])
+menu = st.sidebar.radio("Módulos", ["Clientes", "Equipos", "Órdenes", "Repuestos", "Gerencia", "Técnicos", "Servicios"])
 
 # Solo mostrar la aplicación si la conexión es exitosa
 if conexion_ok:
@@ -61,7 +65,7 @@ if conexion_ok:
         app.ejecutar()
 
     elif menu == "Órdenes":
-        app = OrdenControlador()
+        app = OrdenServicioControlador()
         app.ejecutar()
 
     elif menu == "Repuestos":
@@ -71,6 +75,15 @@ if conexion_ok:
     elif menu == "Gerencia":
         app = ReporteControlador()
         app.ejecutar()
+
+    elif menu == "Técnicos":
+        app = TecnicoControlador()
+        app.ejecutar()
+
+    elif menu == "Servicios":
+        app = CatalogoServicoControlador()
+        app.ejecutar()
+
 else:
     # Mostrar mensaje de error y opciones de solución
     st.error("No se pudo conectar a la base de datos")

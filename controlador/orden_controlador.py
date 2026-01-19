@@ -1,70 +1,232 @@
+import streamlit as st
 from vista.vista_ordenes import VistaOrdenes
-# from modelo.orden import Orden      <-- DESCOMENTAR EL MARTES
-# from modelo.equipo import Equipo    <-- DESCOMENTAR EL MARTES
-# from modelo.tecnico import Tecnico  <-- DESCOMENTAR EL MARTES
 
-class OrdenControlador:
-    def __init__(self):
-        self.vista = VistaOrdenes()
-        # self.modelo_orden = Orden() <-- DESCOMENTAR EL MARTES
-        # self.modelo_equipo = Equipo()
-        # self.modelo_tecnico = Tecnico()
+from modelo.orden import OrdenServicio
+from modelo.orden_detalle_servico import DetalleOrdenServicio
+from modelo.orden_detalle_repuesto import DetalleOrdenRepuesto
+
+from modelo.cliente import Cliente
+from modelo.equipo import equipo
+from modelo.tecnico import Tecnico
+from modelo.catalogo_servicio import CatalogoServicio
+from modelo.repuesto import Repuesto
+
+
+class OrdenServicioControlador:
 
     def ejecutar(self):
-        self.vista.mostrar_titulo()
+        vista = VistaOrdenes()
+        vista.mostrar_titulo()
 
-        tab1, tab2 = "📝 Recepción", "🔧 Taller"
-        active_tab = self.vista.st.tabs([tab1, tab2]) # Usamos st desde la vista
+        # -------------------------
+        # SESSION STATE INICIAL
+        # -------------------------
+        if "orden_id" not in st.session_state:
+            st.session_state.orden_id = None
+            st.session_state.servicios = []
+            st.session_state.repuestos = []
+            st.session_state.estado_orden = None
 
-        # --- PESTAÑA 1: NUEVA ORDEN ---
-        with active_tab[0]:
-            # DATOS MOCK (SIMULADOS) -
-            mapa_equipos = {
-                "Dell XPS 13 (Serie: 12345)": 1,
-                "HP Pavilion (Serie: 67890)": 2
-            }
-            mapa_tecnicos = {
-                "Juan Pérez (Hardware)": 1,
-                "Maria López (Software)": 2
-            }
+        # -------------------------
+        # MAPAS PARA SELECTBOX
+        # -------------------------
+        mapa_clientes = {
+            f"{c['nombres']} {c['apellidos']}": c["id_cliente"]
+            for c in Cliente.listar_todos()
+        }
 
-            # DATOS REALES
-            # equipos_raw = self.modelo_equipo.obtener_todos_con_propietario()
-            # mapa_equipos = {f"{e['marca']} {e['modelo']}": e['id_equipo'] for e in equipos_raw}
-            # tecnicos_raw = self.modelo_tecnico.obtener_todos()
-            # mapa_tecnicos = {t['nombres']: t['id_tecnico'] for t in tecnicos_raw}
+        mapa_equipos = {
+            f"{e['tipo_equipo']} {e['marca']} ({e['numero_serie']})": e["id_equipo"]
+            for e in equipo.listar_todos()
+        }
 
-            datos_form = self.vista.mostrar_formulario_creacion(mapa_equipos, mapa_tecnicos)
+        mapa_tecnicos = {
+            f"{t['nombres']} {t['apellidos']}": t["id_tecnico"]
+            for t in Tecnico.listar_todos()
+        }
 
-            if datos_form:
-                # LÓGICA DE GUARDADO
-                # self.modelo_orden.crear_orden(...) <-- REAL
-                self.vista.exito(f"Simulación: Orden creada para {datos_form['key_equipo']}")
+        mapa_servicios = {
+            f"{s['nombre_servicio']} - ${s['precio_base']}": s["id_servicio"]
+            for s in CatalogoServicio.listar_todos()
+        }
 
-        # --- PESTAÑA 2: GESTIÓN Y ACTUALIZACIÓN ---
-        with active_tab[1]:
-            # DATOS MOCK (SIMULADOS)
-            lista_ordenes = [
-                {"id_orden": 101, "fecha": "2023-10-25", "estado": "Recibido", "modelo": "Dell XPS", "tecnico_nombre": "Juan"},
-                {"id_orden": 102, "fecha": "2023-10-24", "estado": "Diagnóstico", "modelo": "HP Pavilion", "tecnico_nombre": "Maria"},
-                {"id_orden": 103, "fecha": "2023-10-20", "estado": "Listo para Retiro", "modelo": "Macbook Air", "tecnico_nombre": "Pedro"},
-            ]
+        mapa_repuestos = {
+            f"{r['nombre']} ({r['stock_actual']} en stock)": r["id_repuesto"]
+            for r in Repuesto.listar_todos()
+        }
 
-            # DATOS REALES
-            # lista_ordenes = self.modelo_orden.obtener_todas()
+        # -------------------------
+        # CREAR ORDEN (CABECERA)
+        # -------------------------
+        if st.session_state.orden_id is None:
 
-            datos_update = self.vista.mostrar_bandeja_gestion(lista_ordenes)
+            data = vista.formulario_crear_orden(
+                mapa_clientes, mapa_equipos, mapa_tecnicos
+            )
 
-            if datos_update:
-                id_orden = datos_update["id_orden"]
-                estado = datos_update["nuevo_estado"]
+            if data:
+                id_cliente = mapa_clientes[data["cliente"]]
+                id_equipo = mapa_equipos[data["equipo"]]
+                id_tecnico = None if data["tecnico"] == "Sin asignar" else mapa_tecnicos[data["tecnico"]]
 
-                # LÓGICA DE ACTUALIZACIÓN
-                # exito, msg = self.modelo_orden.actualizar_estado(id_orden, estado) <-- REAL
-                # if exito: self.vista.exito(msg)
+                orden = OrdenServicio(
+                    id_equipo=id_equipo,
+                    id_cliente=id_cliente,
+                    id_tecnico=id_tecnico,
+                    fecha_estimada_entrega=data["fecha_estimada"],
+                    estado=data["estado"],
+                    problema_reportado=data["problema"]
+                )
 
-                # SIMULACIÓN
-                if estado == "Entregado":
-                    self.vista.exito(f"🎉 Orden #{id_orden} entregada al cliente. ¡Proceso cerrado!")
-                else:
-                    self.vista.exito(f"Simulación: Estado de Orden #{id_orden} cambiado a '{estado}'.")
+                st.session_state.orden_id = orden.guardar()
+                st.session_state.estado_orden = data["estado"]
+
+                vista.exito("Orden de servicio creada correctamente")
+                st.rerun()
+
+        # -------------------------
+        # BLOQUEO SI ENTREGADA
+        # -------------------------
+        if st.session_state.estado_orden == "ENTREGADO":
+            st.warning("⚠️ Esta orden está ENTREGADA. No se puede modificar.")
+            self._mostrar_resumen(vista)
+            return
+
+        # -------------------------
+        # AGREGAR SERVICIOS
+        # -------------------------
+        servicio = vista.formulario_agregar_servicio(mapa_servicios)
+        if servicio:
+            st.session_state.servicios.append({
+                "id_servicio": mapa_servicios[servicio["servicio"]],
+                "precio": servicio["precio"],
+                "observacion": servicio["observacion"]
+            })
+            st.rerun()
+
+        # -------------------------
+        # AGREGAR REPUESTOS
+        # -------------------------
+        repuesto = vista.formulario_agregar_repuesto(mapa_repuestos)
+        if repuesto:
+            st.session_state.repuestos.append({
+                "id_repuesto": mapa_repuestos[repuesto["repuesto"]],
+                "cantidad": repuesto["cantidad"],
+                "precio": repuesto["precio"]
+            })
+            st.rerun()
+
+        # -------------------------
+        # MOSTRAR DETALLES
+        # -------------------------
+        vista.mostrar_detalles(
+            st.session_state.servicios,
+            st.session_state.repuestos
+        )
+
+        # -------------------------
+        # TOTAL AUTOMÁTICO
+        # -------------------------
+        total = self._calcular_total()
+        st.metric("💰 Total Estimado", f"${total:.2f}")
+
+        # -------------------------
+        # CONFIRMAR ORDEN
+        # -------------------------
+        if st.button("✅ Confirmar Orden"):
+            self._guardar_detalles()
+            OrdenServicio.actualizar_total(
+                st.session_state.orden_id,
+                total
+            )
+            vista.exito("Orden finalizada correctamente")
+            self._reset()
+            st.rerun()
+
+        # -------------------------
+        # VER ÓRDENES EXISTENTES
+        # -------------------------
+        ordenes = OrdenServicio.listar_ordenes()
+
+        det_serv = []
+        det_rep = []
+
+        if ordenes:
+            for o in ordenes:
+                det_serv.extend(
+                    DetalleOrdenServicio.listar_por_orden(o["id_orden"])
+                )
+                det_rep.extend(
+                    DetalleOrdenRepuesto.listar_por_orden(o["id_orden"])
+                )
+
+            id_sel = vista.mostrar_ordenes_registradas(
+                ordenes,
+                det_serv,
+                det_rep
+            )
+
+            if id_sel and st.button("📂 Cargar Orden"):
+                orden = next(o for o in ordenes if o["id_orden"] == id_sel)
+
+                st.session_state.orden_id = orden["id_orden"]
+                st.session_state.estado_orden = orden["estado"]
+
+                st.session_state.servicios = [
+                    {
+                        "precio": d["precio_aplicado"],
+                        "observacion": d["observacion"]
+                    }
+                    for d in det_serv if d["id_orden"] == id_sel
+                ]
+
+                st.session_state.repuestos = [
+                    {
+                        "cantidad": d["cantidad"],
+                        "precio": d["precio_venta"]
+                    }
+                    for d in det_rep if d["id_orden"] == id_sel
+                ]
+
+                st.rerun()
+
+    # =====================================================
+    # MÉTODOS PRIVADOS
+    # =====================================================
+    def _calcular_total(self):
+        total_servicios = sum(s["precio"] for s in st.session_state.servicios)
+        total_repuestos = sum(
+            r["precio"] * r["cantidad"] for r in st.session_state.repuestos
+        )
+        return total_servicios + total_repuestos
+
+    def _guardar_detalles(self):
+        for s in st.session_state.servicios:
+            DetalleOrdenServicio(
+                id_orden=st.session_state.orden_id,
+                id_servicio=s["id_servicio"],
+                precio_aplicado=s["precio"],
+                observacion=s["observacion"]
+            ).guardar()
+
+        for r in st.session_state.repuestos:
+            DetalleOrdenRepuesto(
+                id_orden=st.session_state.orden_id,
+                id_repuesto=r["id_repuesto"],
+                cantidad=r["cantidad"],
+                precoin_venta=r["precio"]
+            ).guardar()
+
+    def _mostrar_resumen(self, vista):
+        vista.mostrar_detalles(
+            st.session_state.servicios,
+            st.session_state.repuestos
+        )
+        total = self._calcular_total()
+        st.metric("💰 Total Final", f"${total:.2f}")
+
+    def _reset(self):
+        st.session_state.orden_id = None
+        st.session_state.servicios = []
+        st.session_state.repuestos = []
+        st.session_state.estado_orden = None

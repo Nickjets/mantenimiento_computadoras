@@ -1,59 +1,143 @@
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from db_config import get_connection
+from db_config import db_config
 
-class Orden:
-    def crear_orden(self, id_equipo, id_tecnico, problema, fecha_entrega):
-        conn = get_connection()
-        try:
-            cursor = conn.cursor()
-            # Estado inicial automático: 'Recibido'
-            sql = """INSERT INTO ORDEN_SERVICIO
-                     (id_equipo, id_tecnico, problema_reportado, fecha_estimada_entrega, estado)
-                     VALUES (%s, %s, %s, %s, 'Recibido')"""
-            val = (id_equipo, id_tecnico, problema, fecha_entrega)
-            cursor.execute(sql, val)
-            conn.commit()
-            return True, "✅ Orden generada correctamente."
-        except Exception as e:
-            return False, f"❌ Error SQL: {e}"
-        finally:
-            if conn: conn.close()
+class OrdenServicio:
 
-    def obtener_todas(self):
-        conn = get_connection()
-        if not conn: return []
-        try:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            # Traemos datos útiles para la tabla (Join con Equipo y Técnico)
-            sql = """
-                  SELECT
-                      O.id_orden, O.fecha_recepcion, O.estado, O.fecha_estimada_entrega,
-                      E.marca, E.modelo,
-                      T.nombres as tecnico_nombre
-                  FROM ORDEN_SERVICIO O
-                           JOIN EQUIPO E ON O.id_equipo = E.id_equipo
-                           JOIN TECNICO T ON O.id_tecnico = T.id_tecnico
-                  ORDER BY O.id_orden DESC \
-                  """
-            cursor.execute(sql)
-            return cursor.fetchall()
-        except Exception as e:
-            print(f"Error listando órdenes: {e}")
-            return []
-        finally:
-            if conn: conn.close()
+    def __init__(
+            self,
+            id_orden=None,
+            id_equipo=None,
+            id_cliente=None,
+            id_tecnico=None,
+            fecha_estimada_entrega=None,
+            estado="RECIBIDO",
+            problema_reportado="",
+            diagnostico_tecnico="",
+            total_estimado=0
+    ):
+        self.id_orden = id_orden
+        self.id_equipo = id_equipo
+        self.id_cliente = id_cliente
+        self.id_tecnico = id_tecnico
+        self.fecha_estimada_entrega = fecha_estimada_entrega
+        self.estado = estado
+        self.problema_reportado = problema_reportado
+        self.diagnostico_tecnico = diagnostico_tecnico
+        self.total_estimado = total_estimado
 
-    def actualizar_estado(self, id_orden, nuevo_estado):
-        conn = get_connection()
+    def guardar(self):
+        conn = db_config.get_connection()
         try:
-            cursor = conn.cursor()
-            sql = "UPDATE ORDEN_SERVICIO SET estado = %s WHERE id_orden = %s"
-            val = (nuevo_estado, id_orden)
-            cursor.execute(sql, val)
-            conn.commit()
-            return True, f"✅ Estado actualizado a '{nuevo_estado}'."
-        except Exception as e:
-            return False, f"❌ Error actualizando estado: {e}"
+            with conn.cursor() as cur:
+                cur.execute("""
+                            INSERT INTO orden_servicio (
+                                id_equipo, id_cliente, id_tecnico,
+                                fecha_estimada_entrega, estado,
+                                problema_reportado, diagnostico_tecnico,
+                                total_estimado
+                            )
+                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                                RETURNING id_orden
+                            """, (
+                                self.id_equipo,
+                                self.id_cliente,
+                                self.id_tecnico,
+                                self.fecha_estimada_entrega,
+                                self.estado,
+                                self.problema_reportado,
+                                self.diagnostico_tecnico,
+                                self.total_estimado
+                            ))
+                self.id_orden = cur.fetchone()[0]
+                conn.commit()
+                return self.id_orden
         finally:
-            if conn: conn.close()
+            conn.close()
+
+    @staticmethod
+    def actualizar_total(id_orden, total):
+        conn = db_config.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                            UPDATE orden_servicio
+                            SET total_estimado=%s
+                            WHERE id_orden=%s
+                            """, (total, id_orden))
+                conn.commit()
+        finally:
+            conn.close()
+
+    @staticmethod
+    def listar_todos():
+        conn = db_config.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                            SELECT id_orden, id_equipo, id_cliente, id_tecnico,
+                                   fecha_recepcion, fecha_estimada_entrega,
+                                   estado, problema_reportado,
+                                   diagnostico_tecnico, total_estimado
+                            FROM orden_servicio
+                            ORDER BY id_orden DESC
+                            """)
+                return [
+                    dict(zip(
+                        [
+                            "id_orden","id_equipo","id_cliente","id_tecnico",
+                            "fecha_recepcion","fecha_estimada_entrega",
+                            "estado","problema_reportado",
+                            "diagnostico_tecnico","total_estimado"
+                        ],
+                        row
+                    )) for row in cur.fetchall()
+                ]
+        finally:
+            conn.close()
+
+    @staticmethod
+    def eliminar(id_orden):
+        conn = db_config.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM orden_servicio WHERE id_orden=%s", (id_orden,))
+                conn.commit()
+        finally:
+            conn.close()
+
+    @staticmethod
+    def listar_ordenes():
+        conn = db_config.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                            SELECT o.id_orden,
+                                   c.nombres || ' ' || c.apellidos AS cliente,
+                                   e.tipo_equipo || ' ' || e.marca AS equipo,
+                                   COALESCE(t.nombres || ' ' || t.apellidos, 'Sin asignar') AS tecnico,
+                                   o.estado,
+                                   o.fecha_recepcion,
+                                   o.fecha_estimada_entrega,
+                                   o.problema_reportado,
+                                   o.total_estimado
+                            FROM orden_servicio o
+                                     JOIN cliente c ON c.id_cliente = o.id_cliente
+                                     JOIN equipo e ON e.id_equipo = o.id_equipo
+                                     LEFT JOIN tecnico t ON t.id_tecnico = o.id_tecnico
+                            ORDER BY o.id_orden DESC
+                            """)
+                return [
+                    {
+                        "id_orden": r[0],
+                        "cliente": r[1],
+                        "equipo": r[2],
+                        "tecnico": r[3],
+                        "estado": r[4],
+                        "fecha_recepcion": r[5],
+                        "fecha_estimada": r[6],
+                        "problema": r[7],
+                        "total": r[8] or 0
+                    }
+                    for r in cur.fetchall()
+                ]
+        finally:
+            conn.close()
