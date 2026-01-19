@@ -1,42 +1,94 @@
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from db_config import get_connection
+from db_config import db_config
 
-class Equipo:
-    def crear_equipo(self, id_cliente, tipo, marca, modelo, serie, observaciones):
-        conn = get_connection()
-        try:
-            cursor = conn.cursor()
-            sql = """INSERT INTO EQUIPO (id_cliente, tipo_equipo, marca, modelo, numero_serie, observaciones_fisicas)
-                     VALUES (%s, %s, %s, %s, %s, %s)"""
-            val = (id_cliente, tipo, marca, modelo, serie, observaciones)
-            cursor.execute(sql, val)
-            conn.commit()
-            return True, "✅ Equipo registrado exitosamente."
-        except Exception as e:
-            return False, f"❌ Error al guardar equipo: {e}"
-        finally:
-            if conn: conn.close()
+class equipo:
+    def __init__(
+            self,
+            id_equipo=None,
+            id_cliente=None,
+            tipo_equipo="",
+            marca="",
+            modelo="",
+            numero_serie="",
+            observaciones_fisicas=""
+    ):
+        self.id_equipo = id_equipo
+        self.id_cliente = id_cliente
+        self.tipo_equipo = tipo_equipo
+        self.marca = marca
+        self.modelo = modelo
+        self.numero_serie = numero_serie
+        self.observaciones_fisicas = observaciones_fisicas
 
-    def obtener_todos_con_propietario(self):
-        conn = get_connection()
-        if not conn: return []
+    # ---------- CRUD ----------
+
+    def guardar(self):
+        conn = db_config.get_connection()
         try:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            # JOIN CLAVE: Unimos EQUIPO con CLIENTE
-            sql = """
-                  SELECT
-                      E.id_equipo, E.tipo_equipo, E.marca, E.modelo, E.numero_serie,
-                      CONCAT(C.nombres, ' ', C.apellidos) AS dueno_nombre,
-                      E.observaciones_fisicas
-                  FROM EQUIPO E
-                           JOIN CLIENTE C ON E.id_cliente = C.id_cliente
-                  ORDER BY E.id_equipo DESC \
-                  """
-            cursor.execute(sql)
-            return cursor.fetchall()
-        except Exception as e:
-            print(f"Error listando equipos: {e}")
-            return []
+            with conn.cursor() as cur:
+                cur.execute("""
+                            INSERT INTO equipo (
+                                id_cliente, tipo_equipo, marca, modelo,
+                                numero_serie, observaciones_fisicas
+                            )
+                            VALUES (%s,%s,%s,%s,%s,%s)
+                            """, (
+                                self.id_cliente,
+                                self.tipo_equipo,
+                                self.marca,
+                                self.modelo,
+                                self.numero_serie,
+                                self.observaciones_fisicas
+                            ))
+                conn.commit()
         finally:
-            if conn: conn.close()
+            conn.close()
+
+    @staticmethod
+    def listar_todos():
+        """
+        Lista equipos con datos del cliente (JOIN)
+        """
+        conn = db_config.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                            SELECT
+                                e.id_equipo,
+                                c.id_cliente,
+                                c.nombres || ' ' || c.apellidos AS cliente,
+                                e.tipo_equipo,
+                                e.marca,
+                                e.modelo,
+                                e.numero_serie,
+                                e.observaciones_fisicas
+                            FROM equipo e
+                                     JOIN cliente c ON c.id_cliente = e.id_cliente
+                            ORDER BY e.id_equipo DESC
+                            """)
+                return [
+                    dict(zip(
+                        [
+                            "id_equipo",
+                            "id_cliente",
+                            "cliente",
+                            "tipo_equipo",
+                            "marca",
+                            "modelo",
+                            "numero_serie",
+                            "observaciones_fisicas"
+                        ],
+                        row
+                    )) for row in cur.fetchall()
+                ]
+        finally:
+            conn.close()
+
+    @staticmethod
+    def eliminar(id_equipo):
+        conn = db_config.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM equipo WHERE id_equipo=%s", (id_equipo,))
+                conn.commit()
+        finally:
+            conn.close()

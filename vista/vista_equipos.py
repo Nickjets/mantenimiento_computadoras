@@ -2,63 +2,82 @@ import streamlit as st
 
 class VistaEquipos:
 
-    def __init__(self):
-        # Permitimos que el controlador acceda a funciones de Streamlit si es necesario
-        self.st = st
-
-    def mostrar_titulo(self):
+    @staticmethod
+    def mostrar_titulo():
         st.header("💻 Gestión de Equipos")
 
-    def mostrar_formulario_registro(self, lista_nombres_clientes):
+    @staticmethod
+    def mostrar_formulario_registro(lista_clientes):
         """
-        Dibuja el formulario de registro.
-        :param lista_nombres_clientes: Lista simple ["Juan Perez", "Maria Lopez"]
-        :return: Diccionario con los datos ingresados O None si no se pulsó guardar.
+        lista_clientes: lista de dicts [{id_cliente, nombre}]
         """
-        with st.expander("➕ Ingresar Nuevo Equipo al Taller", expanded=True):
+        with st.expander("➕ Ingresar Nuevo Equipo al Taller", expanded=False):
             with st.form("form_equipo"):
-                # El selectbox se llena con la lista que le manda el Controlador
-                cliente_seleccionado = st.selectbox("Propietario (Cliente)", options=lista_nombres_clientes)
+                cliente = st.selectbox(
+                    "Propietario (Cliente)",
+                    options=lista_clientes,
+                    format_func=lambda c: c["nombre"]
+                )
 
                 col1, col2 = st.columns(2)
                 with col1:
-                    tipo = st.selectbox("Tipo de Equipo", ["Laptop", "PC Escritorio", "All-in-One", "Impresora", "Servidor", "Otro"])
-                    marca = st.text_input("Marca (Ej: Dell, HP)")
+                    tipo = st.selectbox(
+                        "Tipo de Equipo",
+                        ["Laptop", "PC Escritorio", "All-in-One", "Impresora", "Servidor", "Otro"]
+                    )
+                    marca = st.text_input("Marca")
                 with col2:
                     modelo = st.text_input("Modelo")
-                    serie = st.text_input("Número de Serie / Service Tag")
+                    serie = st.text_input("Número de Serie")
 
-                observaciones = st.text_area("Estado Físico (Rayones, golpes, cargador incluido...)", height=80)
+                observaciones = st.text_area("Estado Físico")
 
-                submitted = st.form_submit_button("Guardar Equipo")
-
-                if submitted:
-                    # Empaquetamos los datos y se los devolvemos al Controlador
+                if st.form_submit_button("Guardar Equipo"):
                     return {
-                        "cliente_nombre": cliente_seleccionado,
-                        "tipo": tipo,
+                        "id_cliente": cliente["id_cliente"],
+                        "tipo_equipo": tipo,
                         "marca": marca,
                         "modelo": modelo,
-                        "serie": serie,
-                        "observaciones": observaciones
+                        "numero_serie": serie,
+                        "observaciones_fisicas": observaciones
                     }
         return None
 
-    def mostrar_tabla_inventario(self, datos_equipos):
-        """
-        Muestra la tabla de equipos.
-        :param datos_equipos: Lista de diccionarios o DataFrame.
-        """
-        st.subheader("📋 Inventario de Equipos en Taller")
+    @staticmethod
+    def mostrar_tabla(datos):
+        st.subheader("📋 Inventario de Equipos")
 
-        if not datos_equipos:
-            st.info("No hay equipos registrados aún.")
-        else:
-            # use_container_width hace que la tabla ocupe todo el ancho
-            st.dataframe(datos_equipos, use_container_width=True)
+        if not datos:
+            st.info("No hay equipos registrados")
+            return (None, None)
 
-    def mostrar_exito(self, mensaje):
-        st.success(mensaje)
+        headers = ["ID", "Cliente", "Tipo", "Marca", "Modelo", "Serie", "Acciones"]
+        cols = st.columns([1, 3, 2, 2, 2, 2, 2])
 
-    def mostrar_error(self, mensaje):
-        st.error(mensaje)
+        for col, h in zip(cols, headers):
+            col.markdown(f"**{h}**")
+
+        st.divider()
+
+        for e in datos:
+            c1, c2, c3, c4, c5, c6, c7 = st.columns([1,3,2,2,2,2,2])
+
+            c1.write(e["id_equipo"])
+            c2.write(e["cliente"])
+            c3.write(e["tipo_equipo"])
+            c4.write(e["marca"])
+            c5.write(e["modelo"])
+            c6.write(e["numero_serie"])
+
+            with c7:
+                eliminar = st.button("❌", key=f"del_eq_{e['id_equipo']}")
+
+            if eliminar:
+                return ("eliminar", e)
+
+        return (None, None)
+
+    @staticmethod
+    def mensaje_exito(msg): st.success(msg)
+    @staticmethod
+    def mensaje_error(msg): st.error(msg)
