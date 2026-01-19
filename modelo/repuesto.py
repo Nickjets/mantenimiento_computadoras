@@ -1,32 +1,51 @@
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from db_config import get_connection
+from db_config import db_config
 
 class Repuesto:
-    def crear_repuesto(self, nombre, marca, stock, precio):
-        conn = get_connection()
-        try:
-            cursor = conn.cursor()
-            sql = """INSERT INTO REPUESTO (nombre, marca, stock_actual, precio_unitario)
-                     VALUES (%s, %s, %s, %s)"""
-            val = (nombre, marca, stock, precio)
-            cursor.execute(sql, val)
-            conn.commit()
-            return True, "✅ Repuesto guardado en bodega."
-        except Exception as e:
-            return False, f"❌ Error SQL: {e}"
-        finally:
-            if conn: conn.close()
 
-    def obtener_todos(self):
-        conn = get_connection()
-        if not conn: return []
+    def __init__(self, id_repuesto=None, nombre="", marca="", stock_actual=0, precio_unitario=0):
+        self.id_repuesto = id_repuesto
+        self.nombre = nombre
+        self.marca = marca
+        self.stock_actual = stock_actual
+        self.precio_unitario = precio_unitario
+
+    def guardar(self):
+        conn = db_config.get_connection()
         try:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            sql = "SELECT * FROM REPUESTO ORDER BY nombre ASC"
-            cursor.execute(sql)
-            return cursor.fetchall()
-        except Exception as e:
-            return []
+            with conn.cursor() as cur:
+                cur.execute("""
+                            INSERT INTO repuesto (nombre, marca, stock_actual, precio_unitario)
+                            VALUES (%s,%s,%s,%s)
+                            """, (self.nombre, self.marca, self.stock_actual, self.precio_unitario))
+                conn.commit()
         finally:
-            if conn: conn.close()
+            conn.close()
+
+    @staticmethod
+    def listar_todos():
+        conn = db_config.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                            SELECT id_repuesto, nombre, marca, stock_actual, precio_unitario
+                            FROM repuesto
+                            ORDER BY id_repuesto DESC
+                            """)
+                return [
+                    dict(zip(
+                        ["id_repuesto","nombre","marca","stock_actual","precio_unitario"],
+                        row
+                    )) for row in cur.fetchall()
+                ]
+        finally:
+            conn.close()
+
+    @staticmethod
+    def eliminar(id_repuesto):
+        conn = db_config.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM repuesto WHERE id_repuesto=%s", (id_repuesto,))
+                conn.commit()
+        finally:
+            conn.close()
