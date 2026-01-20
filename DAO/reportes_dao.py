@@ -7,7 +7,7 @@ class ReportesDAO:
         self.connection = db_config.db_config.get_connection()
 
     def _ejecutar_query(self, query: str, params: tuple = None) -> List[Dict[str, Any]]:
-        """Método genérico para ejecutar queries y devolver resultados como diccionarios"""
+        """Me  todo genérico para ejecutar queries y devolver resultados como diccionarios"""
         try:
             cursor = self.connection.cursor()
             cursor.execute(query, params or ())
@@ -26,10 +26,13 @@ class ReportesDAO:
             print(f"Error en query: {str(e)}")
             return []
 
+
     def _ejecutar_query_dataframe(self, query: str, params: tuple = None) -> pd.DataFrame:
         """Ejecuta query y devuelve DataFrame"""
         resultados = self._ejecutar_query(query, params)
         return pd.DataFrame(resultados) if resultados else pd.DataFrame()
+
+
 
     # 1. Vista para órdenes de servicio con información completa
     def obtener_ordenes_completas(self, estado: str = None, fecha_desde: str = None, fecha_hasta: str = None):
@@ -147,10 +150,7 @@ class ReportesDAO:
     def financiero_mensual(self, meses_atras: int = 12):
         query = """
                 SELECT * FROM vista_financiero_mensual
-                WHERE mes >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '%s months')
-                ORDER BY mes DESC \
                 """
-
         return self._ejecutar_query_dataframe(query, (meses_atras,))
 
     # 8. Vista de equipos 'Abandonados'
