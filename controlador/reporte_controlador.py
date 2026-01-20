@@ -256,7 +256,7 @@ class ReporteControlador:
         st.subheader("💰 Reporte Financiero Mensual")
 
         # Obtener datos
-        df = self.dao.financiero_mensual(meses_atras=12)
+        df = self.dao.financiero_mensual(meses_atras=3)
 
         if not df.empty:
             # Mostrar tabla
