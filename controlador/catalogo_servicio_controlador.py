@@ -10,13 +10,16 @@ class CatalogoServicoControlador:
         datos = VistaCatalogoServicio.formulario()
         if datos:
             CatalogoServicio(**datos).guardar()
-            st.success("Técnico registrado")
+            st.success("Servicio registrado")
             st.rerun()
 
-        tecnicos = CatalogoServicio.listar_todos()
-        eliminar = VistaCatalogoServicio.tabla(tecnicos)
+        servicios = CatalogoServicio.listar_todos()
+        eliminar = VistaCatalogoServicio.tabla(servicios)
 
         if eliminar:
-            CatalogoServicio.eliminar(eliminar["id_tecnico"])
-            st.success("Técnico eliminado")
-            st.rerun()
+            resultado = CatalogoServicio.eliminar(eliminar["id_servicio"])
+            if resultado:
+                st.success("Servicio eliminado")
+                st.rerun()
+            else:
+                st.error("⚠️ No se puede eliminar este servicio porque está siendo usado en órdenes de servicio")

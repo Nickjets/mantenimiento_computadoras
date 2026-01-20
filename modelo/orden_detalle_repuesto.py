@@ -8,13 +8,13 @@ class DetalleOrdenRepuesto:
             id_orden=None,
             id_repuesto=None,
             cantidad=1,
-            precoin_venta=0
+            precio_venta=0
     ):
         self.id_detalle_repuesto = id_detalle_repuesto
         self.id_orden = id_orden
         self.id_repuesto = id_repuesto
         self.cantidad = cantidad
-        self.precoin_venta = precoin_venta
+        self.precio_venta = precio_venta
 
     def guardar(self):
         conn = db_config.get_connection()
@@ -22,13 +22,13 @@ class DetalleOrdenRepuesto:
             with conn.cursor() as cur:
                 cur.execute("""
                             INSERT INTO detalle_orden_repuesto
-                                (id_orden, id_repuesto, cantidad, precoin_venta)
+                                (id_orden, id_repuesto, cantidad, precio_venta)
                             VALUES (%s,%s,%s,%s)
                             """, (
                                 self.id_orden,
                                 self.id_repuesto,
                                 self.cantidad,
-                                self.precoin_venta
+                                self.precio_venta
                             ))
                 conn.commit()
         finally:
@@ -41,13 +41,13 @@ class DetalleOrdenRepuesto:
             with conn.cursor() as cur:
                 cur.execute("""
                             SELECT id_detalle_repuesto, id_orden,
-                                   id_repuesto, cantidad, precoin_venta
+                                   id_repuesto, cantidad, precio_venta
                             FROM detalle_orden_repuesto
                             WHERE id_orden=%s
                             """, (id_orden,))
                 return [
                     dict(zip(
-                        ["id_detalle_repuesto","id_orden","id_repuesto","cantidad","precoin_venta"],
+                        ["id_detalle_repuesto","id_orden","id_repuesto","cantidad","precio_venta"],
                         row
                     )) for row in cur.fetchall()
                 ]
@@ -62,7 +62,7 @@ class DetalleOrdenRepuesto:
                 cur.execute("""
                             SELECT r.nombre,
                                    d.cantidad,
-                                   d.precoin_venta
+                                   d.precio_venta
                             FROM detalle_orden_repuesto d
                                      JOIN repuesto r ON r.id_repuesto = d.id_repuesto
                             WHERE d.id_orden = %s
@@ -72,7 +72,7 @@ class DetalleOrdenRepuesto:
                         "id_orden": id_orden,
                         "repuesto": r[0],
                         "cantidad": r[1],
-                        "precoin_venta": r[2]
+                        "precio_venta": r[2]
                     }
                     for r in cur.fetchall()
                 ]

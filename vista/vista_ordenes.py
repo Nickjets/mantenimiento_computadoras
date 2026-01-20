@@ -51,7 +51,7 @@ class VistaOrdenes:
                 height=100
             )
 
-            if st.form_submit_button("📄 Crear Orden"):
+            if st.form_submit_button("🔄 Crear Orden"):
                 return {
                     "cliente": cliente,
                     "equipo": equipo,
@@ -267,7 +267,7 @@ class VistaOrdenes:
 
         if rep:
             st.dataframe(
-                pd.DataFrame(rep)[["repuesto", "cantidad", "precoin_venta"]],
+                pd.DataFrame(rep)[["repuesto", "cantidad", "precio_venta"]],
                 use_container_width=True
             )
         else:
@@ -279,5 +279,43 @@ class VistaOrdenes:
         st.markdown("---")
         st.metric("💰 Total Estimado", f"$ {orden['total']:.2f}")
 
-        return id_orden
+        # -------------------------------
+        # 6. ACCIONES INTERACTIVAS (NUEVO)
+        # -------------------------------
+        st.markdown("---")
+        st.subheader("⚙️ Acciones")
 
+        col_acc1, col_acc2, col_acc3 = st.columns(3)
+
+        accion = None
+
+        with col_acc1:
+            # Cambiar estado
+            nuevo_estado = st.selectbox(
+                "Cambiar Estado",
+                ["RECIBIDO", "EN DIAGNOSTICO", "EN REPARACION", "ESPERANDO REPUESTOS", "LISTO", "ENTREGADO", "CANCELADO"],
+                index=0,
+                key=f"estado_{id_orden}"
+            )
+            if st.button("🔄 Actualizar Estado", key=f"btn_estado_{id_orden}"):
+                accion = {
+                    "tipo": "actualizar_estado",
+                    "id_orden": id_orden,
+                    "nuevo_estado": nuevo_estado
+                }
+
+        with col_acc2:
+            if st.button("📝 Editar Diagnóstico", key=f"btn_diagnostico_{id_orden}"):
+                accion = {
+                    "tipo": "editar_diagnostico",
+                    "id_orden": id_orden
+                }
+
+        with col_acc3:
+            if st.button("🔙 Volver al Listado", key=f"btn_volver_{id_orden}"):
+                accion = {
+                    "tipo": "volver",
+                    "id_orden": None
+                }
+
+        return accion

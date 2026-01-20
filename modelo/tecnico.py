@@ -1,4 +1,5 @@
 from db_config import db_config
+import psycopg2
 
 class Tecnico:
 
@@ -48,5 +49,12 @@ class Tecnico:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM tecnico WHERE id_tecnico=%s", (id_tecnico,))
                 conn.commit()
+                return True
+        except psycopg2.errors.ForeignKeyViolation:
+            conn.rollback()
+            return False
+        except Exception:
+            conn.rollback()
+            return False
         finally:
             conn.close()

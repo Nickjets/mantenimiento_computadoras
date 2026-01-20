@@ -90,6 +90,11 @@ class OrdenServicioControlador:
         if st.session_state.estado_orden == "ENTREGADO":
             st.warning("⚠️ Esta orden está ENTREGADA. No se puede modificar.")
             self._mostrar_resumen(vista)
+
+            # Botón para volver
+            if st.button("🔙 Volver al listado"):
+                self._reset()
+                st.rerun()
             return
 
         # -------------------------
@@ -146,6 +151,7 @@ class OrdenServicioControlador:
         # -------------------------
         # VER ÓRDENES EXISTENTES
         # -------------------------
+        st.markdown("---")
         ordenes = OrdenServicio.listar_ordenes()
 
         det_serv = []
@@ -160,35 +166,31 @@ class OrdenServicioControlador:
                     DetalleOrdenRepuesto.listar_por_orden(o["id_orden"])
                 )
 
-            id_sel = vista.mostrar_ordenes_registradas(
+            # CAPTURAR LA ACCIÓN RETORNADA
+            accion = vista.mostrar_ordenes_registradas(
                 ordenes,
                 det_serv,
                 det_rep
             )
 
-            if id_sel and st.button("📂 Cargar Orden"):
-                orden = next(o for o in ordenes if o["id_orden"] == id_sel)
+            # MANEJAR LAS ACCIONES
+            if accion:
+                if accion["tipo"] == "actualizar_estado":
+                    OrdenServicio.actualizar_estado(
+                        accion["id_orden"],
+                        accion["nuevo_estado"]
+                    )
+                    vista.exito(f"Estado actualizado a {accion['nuevo_estado']}")
+                    st.rerun()
 
-                st.session_state.orden_id = orden["id_orden"]
-                st.session_state.estado_orden = orden["estado"]
+                elif accion["tipo"] == "editar_diagnostico":
+                    st.session_state["editando_diagnostico"] = accion["id_orden"]
+                    st.rerun()
 
-                st.session_state.servicios = [
-                    {
-                        "precio": d["precio_aplicado"],
-                        "observacion": d["observacion"]
-                    }
-                    for d in det_serv if d["id_orden"] == id_sel
-                ]
-
-                st.session_state.repuestos = [
-                    {
-                        "cantidad": d["cantidad"],
-                        "precio": d["precio_venta"]
-                    }
-                    for d in det_rep if d["id_orden"] == id_sel
-                ]
-
-                st.rerun()
+                elif accion["tipo"] == "volver":
+                    if "editando_diagnostico" in st.session_state:
+                        del st.session_state["editando_diagnostico"]
+                    st.rerun()
 
     # =====================================================
     # MÉTODOS PRIVADOS
@@ -214,7 +216,7 @@ class OrdenServicioControlador:
                 id_orden=st.session_state.orden_id,
                 id_repuesto=r["id_repuesto"],
                 cantidad=r["cantidad"],
-                precoin_venta=r["precio"]
+                precio_venta=r["precio"]  # CORREGIDO: precio_venta en lugar de precoin_venta
             ).guardar()
 
     def _mostrar_resumen(self, vista):

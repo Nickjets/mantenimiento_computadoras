@@ -17,6 +17,9 @@ class TecnicoControlador:
         eliminar = VistaTecnico.tabla(tecnicos)
 
         if eliminar:
-            Tecnico.eliminar(eliminar["id_tecnico"])
-            st.success("Técnico eliminado")
-            st.rerun()
+            resultado = Tecnico.eliminar(eliminar["id_tecnico"])
+            if resultado:
+                st.success("Técnico eliminado")
+                st.rerun()
+            else:
+                st.error("⚠️ No se puede eliminar este técnico porque está asignado a órdenes de servicio")
